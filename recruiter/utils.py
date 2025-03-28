@@ -9,6 +9,7 @@ import os
 import re
 import PyPDF2
 from django.core.mail import send_mail
+from .models import CandidateRanking
 from freddie_ai import settings
 from dotenv import load_dotenv
 from groq import Groq
@@ -159,6 +160,29 @@ def rank_candidate(resume_path, candidate):
         print(f"Error ranking candidate {candidate['fullname']}: {e}")
         return 0
 
+def process_candidates(candidates):
+    """Ranks candidates and saves results to the database."""
+    ranked_candidates = []
+
+    for candidate in candidates:
+        resume_path = candidate["resume_path"]  # Ensure this exists
+        score = rank_candidate(resume_path, candidate)
+
+        # Save to DB
+        candidate_entry = CandidateRanking.objects.create(
+            fullname=candidate["fullname"],
+            email=candidate["email"],
+            score=score,
+            resume_link=candidate["resume_link"],
+            screening_q1=candidate["screening_q1"],
+            screening_q2=candidate["screening_q2"],
+            screening_q3=candidate["screening_q3"],
+        )
+
+        ranked_candidates.append(candidate_entry)
+
+    print("All candidates ranked & saved to database!")
+    return ranked_candidates
 
 def send_email(candidate):
     """Send an email to high-ranking candidates using Django's email backend."""
