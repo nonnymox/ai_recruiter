@@ -1,43 +1,38 @@
-from django.http import JsonResponse
-import gspread
-from google.oauth2.service_account import Credentials
 import json
+from django.http import JsonResponse, FileResponse
+from django.shortcuts import get_object_or_404
+from .utils import fetch_candidates_from_sheets, download_resume  # Import functions
 import os
+from django.views import View
 
-# Google Sheets API authentication
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+def get_candidates(request):
+    """Django view to fetch candidates from Google Sheets."""
+    candidates = fetch_candidates_from_sheets()
+    return JsonResponse({"candidates": candidates})
 
+class DownloadResumeView(View):
+    def get(self, request, candidate_name):
+        """Display a candidate's resume in the browser."""
+        candidates = fetch_candidates_from_sheets()
 
-CREDS_PATH = os.path.join(os.getenv("VIRTUAL_ENV"), "recruiter.json")
+        # Normalize candidate name to match the URL format
+        formatted_name = candidate_name.replace("_", " ").lower()
 
+        # Find the candidate with the given name
+        candidate = next((c for c in candidates if c["fullname"].lower() == formatted_name), None)
+        if not candidate:
+            return JsonResponse({"error": "Candidate not found"}, status=404)
 
-CREDS = Credentials.from_service_account_file(CREDS_PATH, scopes=SCOPES)
-client = gspread.authorize(CREDS)
+        resume_link = candidate.get("resume_link", "")
+        if not resume_link:
+            return JsonResponse({"error": "Resume link not available"}, status=400)
 
-# Google Sheet details
-SHEET_ID = "1TPntAcoFPZVCFp-4kYgnqcaWGn5BGeuadU0okc6yWvs"
-SHEET_NAME = "Sheet1"
+        # Download the resume
+        file_path = download_resume(resume_link, candidate["fullname"])
+        if not file_path or not os.path.exists(file_path):
+            return JsonResponse({"error": "Failed to download resume"}, status=500)
 
-def fetch_candidates(request):
-    """Fetch all candidates' information from Google Sheets, display in console, and return as JSON."""
-    sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-    data = sheet.get_all_records()
-
-    # Map the data fields correctly
-    candidates = [
-        {
-            "fullname": row.get("Full Name", ""),  
-            "email": row.get("Email", ""),  
-            "resume_link": row.get("Resume Link", ""),  
-            "screening_q1": row.get("Screening Q1 (What are your key strengths?)", ""),  
-            "screening_q2": row.get("Screening Q2 (What is your biggest weakness?)", ""),  
-            "screening_q3": row.get("Screening Q3 (Are you available immediately?)", "")  
-        }
-        for row in data
-    ]
-
-    # Print candidates data to the console in a readable format
-    print("\nFetched Candidates Data:")
-    print(json.dumps(candidates, indent=4))
-
-    return JsonResponse({"candidates": candidates}, safe=False)
+        # ✅ Display PDF in browser instead of downloading
+        response = FileResponse(open(file_path, "rb"), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{os.path.basename(file_path)}"'  # Use 'inline' instead of 'attachment'
+        return response
