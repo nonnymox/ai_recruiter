@@ -1,7 +1,7 @@
 from django.db import models
 
 class CandidateRanking(models.Model):
-    fullname = models.CharField(max_length=255)
+    fullname = models.CharField(max_length=255, primary_key=True)
     email = models.EmailField()
     score = models.IntegerField()
     resume_link = models.TextField()

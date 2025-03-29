@@ -40,31 +40,42 @@ class RankCandidatesView(View):
                 resume_path = download_resume(resume_link, candidate["fullname"])
                 if resume_path and os.path.exists(resume_path):
                     score = rank_candidate(resume_path, candidate)
-                    candidate["score"] = score
-                    rankings.append(candidate)
+
+                    # Create a new dictionary before appending
+                    ranked_candidate = {
+                        "score": score,
+                        "screening_q1": candidate.get("screening_q1", ""),
+                        "screening_q2": candidate.get("screening_q2", ""),
+                        "screening_q3": candidate.get("screening_q3", ""),
+                    }
+                    rankings.append(ranked_candidate)  # Append new object
 
                     # Save ranking in the database
                     CandidateRanking.objects.update_or_create(
-                        email=candidate["email"],
-                        defaults={
-                            "fullname": candidate["fullname"],
-                            "score": score,
-                            "resume_link": resume_link,
-                            "screening_q1": candidate.get("screening_q1", ""),
-                            "screening_q2": candidate.get("screening_q2", ""),
-                            "screening_q3": candidate.get("screening_q3", ""),
-                            "created_at": now(),
-                        },
-                    )
+                    fullname=candidate["fullname"],  # Use fullname as the identifier
+                    defaults={  # ⬅️ Other values will be updated if fullname exists
+                        "email": candidate["email"],  
+                        "score": score,
+                        "resume_link": resume_link,
+                        "screening_q1": candidate.get("screening_q1", ""),
+                        "screening_q2": candidate.get("screening_q2", ""),
+                        "screening_q3": candidate.get("screening_q3", ""),
+                        "created_at": now(),
+                    },
+                )
+                
 
                     # Send email if candidate ranks >= 70
                     if score >= 70:
-                        send_email(gmail_service,candidate)
+                        send_email(gmail_service, candidate)
 
         # Sort candidates by score (highest first)
         rankings.sort(key=lambda x: x["score"], reverse=True)
 
-        return JsonResponse({"rankings": rankings})
+        print(f"Total candidates ranked: {len(rankings)}")  # Debugging
+
+        return JsonResponse({"rankings": rankings}, safe=False)
+
 
 class CandidateRankingListView(View):
     """View to return stored candidate rankings as JSON."""
@@ -105,10 +116,10 @@ class HomeView(View):
 
     def get(self, request):
         endpoints = {
-            "Get details of all candidates": "/candidates/",
+            "Get details of all candidates and download resumes": "/candidates/",
             "Download all resumes": "/download_resumes/",
-            "Rank Candidates": "/rank_candidates/",
-            "View Rankings from Database": "/rankings",
+            "Rank Candidates and send email to qualified candidates": "/rank_candidates/",
+            "View Screening score and candidate details from database": "/rankings",
             "Admin Login View": "/admin"
         }
         return JsonResponse({"available_endpoints": endpoints})
