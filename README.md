@@ -108,9 +108,9 @@ CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 ---
 
 ## API Endpoints
-
+``` bash
 Get details of all candidates: "/candidates/"
 Download all resumes: "/download_resumes/"
 Rank Candidates: "/rank_candidates/"
 View Rankings from Database: "/rankings"
-Admin Login View: "/admin"
+Admin Login View: "/admin" ```
