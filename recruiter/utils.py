@@ -16,10 +16,8 @@ from groq import Groq
 
 load_dotenv()
 
-api_key = os.getenv("GROQ_API_KEY")
-
 # Load OpenAI API Key
-# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 
 # Google Sheets API authentication
@@ -123,10 +121,10 @@ def extract_text_from_pdf(pdf_path):
     return text.strip()
 
 def rank_candidate(resume_path, candidate):
-    """Use Groq API to rank a candidate based on resume and screening answers."""
-    groqclient = Groq(api_key=api_key)
+    """Use OpenAI API to rank a candidate based on resume and screening answers."""
+    openai.api_key = os.getenv("OPENAI_API_KEY")
     resume_text = extract_text_from_pdf(resume_path)
-    
+
     prompt = f"""
     Rate this candidate's fit for a marketing officer role on a scale of 0-100.
     Consider experience, skills, and cultural fit.
@@ -143,22 +141,22 @@ def rank_candidate(resume_path, candidate):
     """
 
     try:
-        response = groqclient.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": prompt}
-            ]
+        response = openai.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "system", "content": prompt}]
         )
 
-        # Access choices properly
         score_text = response.choices[0].message.content.strip()
-        score = int(re.search(r'\d+', score_text).group()) if re.search(r'\d+', score_text) else 0
+        score_match = re.search(r'\d+', score_text)
+        score = int(score_match.group()) if score_match else 0
 
         return score
 
     except Exception as e:
         print(f"Error ranking candidate {candidate['fullname']}: {e}")
         return 0
+
+
 
 def process_candidates(candidates):
     """Ranks candidates and saves results to the database."""
