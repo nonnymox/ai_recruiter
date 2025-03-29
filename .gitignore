@@ -120,7 +120,8 @@ venv.bak/
 *.sublime-project 
 
 # sftp configuration file 
-sftp-config.json 
+sftp-config.json
+*.json 
 
 # Package control specific files Package 
 Control.last-run 

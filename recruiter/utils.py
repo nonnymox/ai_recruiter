@@ -1,3 +1,4 @@
+import pickle
 import openai
 import gspread
 from google.oauth2.service_account import Credentials
@@ -8,11 +9,15 @@ import io
 import os
 import re
 import PyPDF2
-from django.core.mail import send_mail
+from requests import Request
 from .models import CandidateRanking
 from freddie_ai import settings
 from dotenv import load_dotenv
-from groq import Groq
+import base64
+from email.mime.text import MIMEText
+from google_auth_oauthlib.flow import InstalledAppFlow
+
+
 
 load_dotenv()
 
@@ -31,6 +36,12 @@ DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 DRIVE_CREDS_PATH = os.path.join(os.getenv("VIRTUAL_ENV"), "drive-access.json")
 DRIVE_CREDS = Credentials.from_service_account_file(DRIVE_CREDS_PATH, scopes=DRIVE_SCOPES)
 drive_service = build("drive", "v3", credentials=DRIVE_CREDS)
+
+# Gmail API authentication
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
+GMAIL_CREDS = Credentials.from_service_account_file(DRIVE_CREDS_PATH, scopes=GMAIL_SCOPES)
+gmail_service = build("gmail", "v1", credentials=GMAIL_CREDS)
+
 
 # Google Sheet details
 SHEET_ID = "1TPntAcoFPZVCFp-4kYgnqcaWGn5BGeuadU0okc6yWvs"
@@ -182,20 +193,55 @@ def process_candidates(candidates):
     print("All candidates ranked & saved to database!")
     return ranked_candidates
 
-def send_email(candidate):
-    """Send an email to high-ranking candidates using Django's email backend."""
+
+def authenticate_gmail():
+    """Authenticate and return Gmail service."""
+    creds = None
+
+    # Load token if it exists
+    if os.path.exists("token.pkl"):
+        with open("token.pkl", "rb") as token_file:
+            creds = pickle.load(token_file)
+
+    # If credentials are invalid or missing, get new ones
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+            creds = flow.run_local_server(port=0)
+
+        # Save credentials for future use
+        with open("token.pkl", "wb") as token_file:
+            pickle.dump(creds, token_file)
+
+    return build("gmail", "v1", credentials=creds)
+
+
+def send_email(service, candidate):
+    """Send an email to high-ranking candidates using Gmail API."""
+    sender_email = "knonxho@gmail.com"  # Your actual Gmail address
+    recipient = candidate["email"]
     subject = "Next Steps in Your Application"
-    message = f"""
+    
+    message_body = f"""
     Hi {candidate['fullname']},
 
     Thanks for applying! Based on our initial screening, we'd like to move forward with your application.
 
-    Regards,
+    Regards,  
     Recruitment Team
     """
+
+    message = MIMEText(message_body)
+    message["From"] = sender_email  # Add sender email
+    message["To"] = recipient
+    message["Subject"] = subject
+
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
     try:
-        send_mail(subject, message, 'noreply@yourcompany.com', [candidate['email']])
-        print(f"Email sent to {candidate['fullname']}")
+        service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
+        print(f"Email sent to {candidate['fullname']} ({recipient})")
     except Exception as e:
         print(f"Error sending email to {candidate['fullname']}: {e}")
-

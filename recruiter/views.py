@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views import View
 from django.utils.timezone import now  # Ensure this import is present
 from .models import CandidateRanking
-from .utils import fetch_candidates_from_sheets, download_resume, rank_candidate
+from .utils import fetch_candidates_from_sheets, download_resume, rank_candidate, send_email,  authenticate_gmail
 
 class DownloadAllResumesView(View):
     """View to download all resumes and return file paths."""
@@ -32,6 +32,7 @@ class RankCandidatesView(View):
     def get(self, request):
         candidates = fetch_candidates_from_sheets()
         rankings = []
+        gmail_service = authenticate_gmail()
 
         for candidate in candidates:
             resume_link = candidate.get("resume_link", "")
@@ -57,8 +58,8 @@ class RankCandidatesView(View):
                     )
 
                     # Send email if candidate ranks >= 70
-                    # if score >= 70:
-                    #     self.send_email(candidate)
+                    if score >= 70:
+                        send_email(gmail_service,candidate)
 
         # Sort candidates by score (highest first)
         rankings.sort(key=lambda x: x["score"], reverse=True)
