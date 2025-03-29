@@ -43,6 +43,7 @@ class RankCandidatesView(View):
 
                     # Create a new dictionary before appending
                     ranked_candidate = {
+                        "name": candidate["fullname"],
                         "score": score,
                         "screening_q1": candidate.get("screening_q1", ""),
                         "screening_q2": candidate.get("screening_q2", ""),
@@ -116,8 +117,8 @@ class HomeView(View):
 
     def get(self, request):
         endpoints = {
-            "Get details of all candidates and download resumes": "/candidates/",
             "Download all resumes": "/download_resumes/",
+            "Get details of all candidates and download resumes": "/candidates/",
             "Rank Candidates and send email to qualified candidates": "/rank_candidates/",
             "View Screening score and candidate details from database": "/rankings",
             "Admin Login View": "/admin"
