@@ -54,10 +54,10 @@ OPENAI_API_KEY=your_openai_key
 
 ### **5 Place OAuth Credentials**
 
-Ensure `credentials.json` is inside `recruiter/` for correct authentication
+Ensure `credentials.json` is inside the root folder for correct authentication
 
 ```
-recruiter/credentials.json
+ai_recruiter/credentials.json
 ```
 
 Also, the **service account file** should be inside `venv/`:
